@@ -1,0 +1,1537 @@
+/* ============================================
+   SHOOTKNG - Main Menu Stylesheet
+   Space-themed 2D Shooter Game
+   ============================================ */
+
+/* ===== CSS Variables (Design Tokens) ===== */
+:root {
+  --color-bg-deep: #05070f;
+  --color-bg-mid: #0a0e1a;
+  --color-primary: #00e5ff;
+  --color-primary-glow: rgba(0, 229, 255, 0.4);
+  --color-secondary: #ff2d75;
+  --color-secondary-glow: rgba(255, 45, 117, 0.35);
+  --color-accent: #a855f7;
+  --color-text: #e8eaf6;
+  --color-text-dim: rgba(232, 234, 246, 0.5);
+  --color-btn-bg: rgba(10, 14, 30, 0.75);
+  --color-btn-border: rgba(0, 229, 255, 0.3);
+  --font-display: 'Orbitron', sans-serif;
+  --font-body: 'Rajdhani', sans-serif;
+  --transition-fast: 0.25s ease;
+  --transition-normal: 0.4s ease;
+}
+
+/* ===== Reset & Base ===== */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* Prevent scrolling */
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background: var(--color-bg-deep);
+}
+
+/* ===== Space Background Image ===== */
+body::before {
+  content: '';
+  position: fixed;
+  top: -10%;
+  left: -10%;
+  width: 120%;
+  height: 120%;
+  background: url('./assets/space-bg.png') center center / cover no-repeat;
+  z-index: 0;
+  animation: bgDrift 30s ease-in-out infinite alternate;
+  filter: brightness(0.65) saturate(1.3);
+}
+
+/* Slow parallax drift to make the background feel alive */
+@keyframes bgDrift {
+  0%   { transform: translate(0, 0) scale(1); }
+  25%  { transform: translate(1.5%, -1%) scale(1.02); }
+  50%  { transform: translate(-1%, 1.5%) scale(1.01); }
+  75%  { transform: translate(0.5%, -0.5%) scale(1.03); }
+  100% { transform: translate(-1.5%, 0.5%) scale(1); }
+}
+
+/* ===== Animated Starfield Overlay ===== */
+.stars-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Small distant twinkling stars */
+.stars-small {
+  background-image:
+    radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1px 1px at 25% 45%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 40% 10%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 55% 60%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 70% 30%, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1px 1px at 85% 75%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 15% 80%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 90% 15%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 50% 50%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 35% 90%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 60% 85%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 5% 55%, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1px 1px at 78% 48%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 92% 62%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 18% 35%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 63% 22%, rgba(255,255,255,0.6), transparent);
+  animation: twinkle 4s ease-in-out infinite alternate;
+}
+
+/* Medium colored stars */
+.stars-medium {
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 35%, rgba(0, 229, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 45% 70%, rgba(168, 85, 247, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 65% 15%, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1.5px 1.5px at 80% 55%, rgba(0, 229, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 10% 65%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 50% 25%, rgba(168, 85, 247, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 88% 42%, rgba(0, 229, 255, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 33% 58%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1.5px 1.5px at 72% 88%, rgba(168, 85, 247, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 95% 8%, rgba(255, 255, 255, 0.7), transparent);
+  animation: twinkle 6s ease-in-out infinite alternate-reverse;
+}
+
+/* Large bright stars with glow */
+.stars-large {
+  background-image:
+    radial-gradient(3px 3px at 30% 25%, rgba(0, 229, 255, 1), transparent),
+    radial-gradient(2.5px 2.5px at 60% 45%, rgba(255, 45, 117, 0.7), transparent),
+    radial-gradient(3px 3px at 75% 70%, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(2.5px 2.5px at 15% 50%, rgba(168, 85, 247, 0.8), transparent),
+    radial-gradient(3.5px 3.5px at 85% 20%, rgba(0, 229, 255, 0.9), transparent),
+    radial-gradient(2.5px 2.5px at 48% 82%, rgba(255, 45, 117, 0.6), transparent);
+  animation: twinkle 8s ease-in-out infinite alternate;
+}
+
+@keyframes twinkle {
+  0%   { opacity: 0.3; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.5; }
+}
+
+/* ===== Shooting Stars ===== */
+.stars-layer.stars-small::after {
+  content: '';
+  position: absolute;
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.9), transparent);
+  border-radius: 50%;
+  top: 15%;
+  left: -10%;
+  animation: shootingStar1 6s linear infinite 2s;
+  filter: blur(0.5px);
+  box-shadow: 0 0 6px 1px rgba(0, 229, 255, 0.5);
+}
+
+.stars-layer.stars-medium::after {
+  content: '';
+  position: absolute;
+  width: 60px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(168, 85, 247, 0.8), transparent);
+  border-radius: 50%;
+  top: 55%;
+  left: -10%;
+  animation: shootingStar2 8s linear infinite 5s;
+  filter: blur(0.5px);
+  box-shadow: 0 0 6px 1px rgba(168, 85, 247, 0.4);
+}
+
+.stars-layer.stars-large::after {
+  content: '';
+  position: absolute;
+  width: 100px;
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 1), transparent);
+  border-radius: 50%;
+  top: 35%;
+  left: -10%;
+  animation: shootingStar3 10s linear infinite 0s;
+  filter: blur(0.3px);
+  box-shadow: 0 0 8px 2px rgba(0, 229, 255, 0.6);
+}
+
+@keyframes shootingStar1 {
+  0%   { transform: translate(0, 0) rotate(-15deg); opacity: 0; }
+  5%   { opacity: 1; }
+  30%  { transform: translate(110vw, 20vh) rotate(-15deg); opacity: 0; }
+  100% { transform: translate(110vw, 20vh) rotate(-15deg); opacity: 0; }
+}
+
+@keyframes shootingStar2 {
+  0%   { transform: translate(0, 0) rotate(-25deg); opacity: 0; }
+  3%   { opacity: 1; }
+  25%  { transform: translate(110vw, 35vh) rotate(-25deg); opacity: 0; }
+  100% { transform: translate(110vw, 35vh) rotate(-25deg); opacity: 0; }
+}
+
+@keyframes shootingStar3 {
+  0%   { transform: translate(0, 0) rotate(-10deg); opacity: 0; }
+  2%   { opacity: 1; }
+  20%  { transform: translate(110vw, 15vh) rotate(-10deg); opacity: 0; }
+  100% { transform: translate(110vw, 15vh) rotate(-10deg); opacity: 0; }
+}
+
+/* ===== Nebula Glow Overlay ===== */
+.nebula-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    radial-gradient(ellipse 600px 400px at 20% 80%, rgba(168, 85, 247, 0.08), transparent),
+    radial-gradient(ellipse 500px 350px at 80% 20%, rgba(0, 229, 255, 0.06), transparent),
+    radial-gradient(ellipse 800px 500px at 50% 50%, rgba(255, 45, 117, 0.04), transparent);
+}
+
+/* ===== Main Menu Container ===== */
+.menu-container {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 12vh; /* Position title at ~1/3 from top */
+}
+
+/* ===== Game Title ===== */
+.game-title {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 8vw, 7rem);
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.1;
+  margin-bottom: 0.2em;
+  /* Multi-layer text glow */
+  text-shadow:
+    0 0 10px var(--color-primary-glow),
+    0 0 30px var(--color-primary-glow),
+    0 0 60px rgba(0, 229, 255, 0.15);
+  animation: titlePulse 3s ease-in-out infinite alternate;
+}
+
+.title-main {
+  color: var(--color-text);
+}
+
+.title-highlight {
+  color: var(--color-primary);
+  filter: brightness(1.2);
+}
+
+@keyframes titlePulse {
+  0%   { text-shadow: 0 0 10px var(--color-primary-glow), 0 0 30px var(--color-primary-glow), 0 0 60px rgba(0,229,255,0.15); }
+  100% { text-shadow: 0 0 20px var(--color-primary-glow), 0 0 50px var(--color-primary-glow), 0 0 100px rgba(0,229,255,0.25); }
+}
+
+/* ===== Subtitle ===== */
+.game-subtitle {
+  font-family: var(--font-display);
+  font-size: clamp(0.7rem, 2vw, 1.1rem);
+  font-weight: 400;
+  letter-spacing: 0.6em;
+  color: var(--color-text-dim);
+  text-transform: uppercase;
+  margin-bottom: 6vh;
+  text-align: center;
+}
+
+/* ===== Navigation Buttons Container ===== */
+.nav-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+/* ===== Menu Button Styling ===== */
+.menu-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  width: 320px;
+  height: 60px;
+  padding: 0 2rem;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  background: var(--color-btn-bg);
+  border: 1px solid var(--color-btn-border);
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background var(--transition-fast);
+  /* Glassmorphism effect */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Decorative corner accents */
+.menu-btn::before,
+.menu-btn::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: var(--color-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.menu-btn::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+}
+
+.menu-btn::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+}
+
+/* Shine sweep effect element */
+.btn-shine {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.06),
+    transparent
+  );
+  transition: left 0.5s ease;
+  pointer-events: none;
+}
+
+.btn-icon {
+  font-size: 1rem;
+  color: var(--color-primary);
+  transition: color var(--transition-fast), transform var(--transition-fast);
+}
+
+.btn-text {
+  flex: 1;
+  text-align: center;
+}
+
+/* ===== Button Hover Effects ===== */
+.menu-btn:hover {
+  transform: scale(1.05);
+  border-color: var(--color-primary);
+  background: rgba(0, 229, 255, 0.08);
+  box-shadow:
+    0 0 15px var(--color-primary-glow),
+    0 0 40px rgba(0, 229, 255, 0.1),
+    inset 0 0 15px rgba(0, 229, 255, 0.05);
+}
+
+.menu-btn:hover .btn-shine {
+  left: 100%;
+}
+
+.menu-btn:hover .btn-icon {
+  color: #fff;
+  transform: scale(1.2);
+}
+
+.menu-btn:hover::before,
+.menu-btn:hover::after {
+  border-color: var(--color-secondary);
+}
+
+/* Active / Click state */
+.menu-btn:active {
+  transform: scale(0.97);
+  box-shadow:
+    0 0 25px var(--color-primary-glow),
+    inset 0 0 20px rgba(0, 229, 255, 0.1);
+}
+
+/* Focus state for accessibility */
+.menu-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 4px;
+}
+
+/* ===== Individual Button Accent Colors (optional per-button theming) ===== */
+#btn-play:hover {
+  border-color: #00e5ff;
+  box-shadow:
+    0 0 15px rgba(0, 229, 255, 0.4),
+    0 0 40px rgba(0, 229, 255, 0.1),
+    inset 0 0 15px rgba(0, 229, 255, 0.05);
+}
+
+#btn-tutorial:hover {
+  border-color: var(--color-accent);
+  box-shadow:
+    0 0 15px rgba(168, 85, 247, 0.4),
+    0 0 40px rgba(168, 85, 247, 0.1),
+    inset 0 0 15px rgba(168, 85, 247, 0.05);
+}
+
+#btn-tutorial:hover .btn-icon {
+  color: var(--color-accent);
+}
+
+#btn-highscore:hover {
+  border-color: var(--color-secondary);
+  box-shadow:
+    0 0 15px var(--color-secondary-glow),
+    0 0 40px rgba(255, 45, 117, 0.1),
+    inset 0 0 15px rgba(255, 45, 117, 0.05);
+}
+
+#btn-highscore:hover .btn-icon {
+  color: var(--color-secondary);
+}
+
+/* ===== Staggered Entry Animation ===== */
+.menu-btn {
+  opacity: 0;
+  transform: translateY(30px);
+  animation: fadeSlideUp 0.6s ease forwards;
+}
+
+.menu-btn:nth-child(1) { animation-delay: 0.3s; }
+.menu-btn:nth-child(2) { animation-delay: 0.5s; }
+.menu-btn:nth-child(3) { animation-delay: 0.7s; }
+
+@keyframes fadeSlideUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Title entry animation */
+.game-title {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+  animation: titleEntry 0.8s ease forwards 0.1s;
+}
+
+.game-subtitle {
+  opacity: 0;
+  animation: subtitleEntry 0.6s ease forwards 0.4s;
+}
+
+@keyframes titleEntry {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes subtitleEntry {
+  to { opacity: 1; }
+}
+
+/* ===== Footer ===== */
+.menu-footer {
+  position: absolute;
+  bottom: 2rem;
+  font-size: 0.75rem;
+  color: var(--color-text-dim);
+  letter-spacing: 0.1em;
+  font-family: var(--font-body);
+}
+
+/* ============================================
+   MODAL POP-UP STYLES
+   ============================================ */
+
+/* ===== Overlay (Dark backdrop covering full screen) ===== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.85);
+  /* Center the modal box */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Hidden by default */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.35s ease, visibility 0.35s ease;
+}
+
+/* Active state — shown when .active class is added */
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ===== Modal Box (Main popup container) ===== */
+.modal-box {
+  position: relative;
+  width: 420px;
+  max-width: 90vw;
+  padding: 2.5rem 2rem 2rem;
+  background: rgba(18, 20, 35, 0.95);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 0 30px rgba(0, 229, 255, 0.1),
+    0 0 60px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  /* Entry animation */
+  transform: scale(0.85) translateY(20px);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Animate modal box when overlay is active */
+.modal-overlay.active .modal-box {
+  transform: scale(1) translateY(0);
+}
+
+/* Decorative corner accents on modal */
+.modal-box::before,
+.modal-box::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-color: var(--color-primary);
+}
+
+.modal-box::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+  border-radius: 12px 0 0 0;
+}
+
+.modal-box::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+  border-radius: 0 0 12px 0;
+}
+
+/* ===== Close Button ("X" at top-right corner) ===== */
+.modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--color-text-dim);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.modal-close:hover {
+  color: #ff4466;
+  background: rgba(255, 68, 102, 0.1);
+  border-color: rgba(255, 68, 102, 0.4);
+  box-shadow: 0 0 12px rgba(255, 68, 102, 0.25);
+  transform: rotate(90deg) scale(1.1);
+}
+
+.modal-close:active {
+  transform: rotate(90deg) scale(0.95);
+}
+
+/* ===== Modal Header (Icon + Title) ===== */
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.modal-icon {
+  font-size: 1.5rem;
+  color: var(--color-primary);
+  filter: drop-shadow(0 0 6px var(--color-primary-glow));
+}
+
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  text-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+/* ===== Decorative Divider ===== */
+.modal-divider {
+  width: 100%;
+  height: 1px;
+  margin-bottom: 1.25rem;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-primary),
+    var(--color-accent),
+    transparent
+  );
+  opacity: 0.5;
+}
+
+/* ===== Modal Content ===== */
+.modal-content {
+  font-family: var(--font-body);
+}
+
+.modal-text {
+  font-size: 1.05rem;
+  font-weight: 500;
+  line-height: 1.7;
+  color: rgba(232, 234, 246, 0.85);
+  letter-spacing: 0.02em;
+}
+
+/* ===== Score List (Highest Score modal) ===== */
+.score-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.score-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1.2rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.score-item:hover {
+  background: rgba(0, 229, 255, 0.05);
+  border-color: rgba(0, 229, 255, 0.15);
+}
+
+/* Rank badge */
+.score-rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 900;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.rank-gold {
+  background: linear-gradient(135deg, #ffd700, #ffaa00);
+  color: #1a1200;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+}
+
+.rank-silver {
+  background: linear-gradient(135deg, #c0c0c0, #9a9a9a);
+  color: #1a1a1a;
+  box-shadow: 0 0 10px rgba(192, 192, 192, 0.3);
+}
+
+.rank-bronze {
+  background: linear-gradient(135deg, #cd7f32, #a0622e);
+  color: #1a1200;
+  box-shadow: 0 0 10px rgba(205, 127, 50, 0.3);
+}
+
+/* Score value text */
+.score-value {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-text);
+}
+
+/* ============================================
+   DIFFICULTY SELECTION SCREEN
+   ============================================ */
+
+/* ===== Difficulty Screen (Fullscreen, hidden by default) ===== */
+.difficulty-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 50;
+  display: none; /* Hidden by default */
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4rem;
+  /* Space background image with dark overlay for depth */
+  background:
+    linear-gradient(to bottom, rgba(5, 7, 15, 0.4), rgba(5, 7, 15, 0.6)),
+    url('./assets/difficulty-bg.png') center center / cover no-repeat;
+  background-color: var(--color-bg-deep);
+}
+
+/* When shown via JS (display: flex) */
+.difficulty-screen.active {
+  display: flex;
+}
+
+/* ===== Top Bar (Back Button + Title) ===== */
+.difficulty-topbar {
+  position: absolute;
+  top: 2rem;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2rem;
+}
+
+/* Back Button (top-left corner) */
+.back-btn {
+  position: absolute;
+  left: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.back-arrow {
+  font-size: 1.4rem;
+  color: var(--color-text);
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.back-btn:hover {
+  background: rgba(0, 229, 255, 0.08);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 15px var(--color-primary-glow);
+  transform: translateX(-3px);
+}
+
+.back-btn:hover .back-arrow {
+  color: var(--color-primary);
+}
+
+.back-btn:active {
+  transform: translateX(-1px) scale(0.95);
+}
+
+/* Difficulty Title */
+.difficulty-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  text-shadow: 0 0 15px var(--color-primary-glow);
+  text-align: center;
+  /* Entry animation */
+  opacity: 0;
+  animation: fadeInDown 0.6s ease forwards 0.1s;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== Difficulty Cards Container (Horizontal) ===== */
+.difficulty-cards {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 2.5rem;
+  padding: 0 2rem;
+}
+
+/* ===== Individual Difficulty Card ===== */
+.diff-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  width: 280px;
+  height: 400px;
+  padding: 2.5rem 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  cursor: pointer;
+  overflow: hidden;
+  /* Background image — set per card below */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition:
+    transform var(--transition-normal),
+    border-color var(--transition-normal),
+    box-shadow var(--transition-normal);
+  /* Staggered entry */
+  opacity: 0;
+  animation: cardSlideUp 0.6s ease forwards;
+}
+
+/* Dark overlay on top of card background image for text readability */
+.diff-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.85) 0%,
+    rgba(0, 0, 0, 0.4) 40%,
+    rgba(0, 0, 0, 0.2) 100%
+  );
+  z-index: 1;
+  transition: background var(--transition-normal);
+}
+
+/* Ensure card content sits above the dark overlay */
+.diff-card-icon,
+.diff-card-label,
+.diff-card-desc {
+  position: relative;
+  z-index: 2;
+}
+
+.diff-card:nth-child(1) { animation-delay: 0.2s; }
+.diff-card:nth-child(2) { animation-delay: 0.4s; }
+.diff-card:nth-child(3) { animation-delay: 0.6s; }
+
+@keyframes cardSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Card top glow bar */
+.diff-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+  z-index: 3;
+  transition: left var(--transition-normal), right var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+/* Per-card background images */
+#btn-easy  { background-image: url('./assets/card-easy-bg.png'); }
+#btn-medium { background-image: url('./assets/card-medium-bg.png'); }
+#btn-hard   { background-image: url('./assets/card-hard-bg.png'); }
+
+/* Card Icon */
+.diff-card-icon {
+  font-size: 4rem;
+  line-height: 1;
+  transition: transform var(--transition-normal), filter var(--transition-normal);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Card Label */
+.diff-card-label {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  transition: color var(--transition-fast), text-shadow var(--transition-fast);
+}
+
+/* Card Description */
+.diff-card-desc {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(232, 234, 246, 0.75);
+  text-align: center;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* ===== Per-Card Accent Colors ===== */
+
+/* Easy — Green */
+#btn-easy .diff-card-icon { color: #4ade80; }
+#btn-easy::before { background: #4ade80; box-shadow: 0 0 10px rgba(74, 222, 128, 0.3); }
+
+#btn-easy:hover {
+  border-color: rgba(74, 222, 128, 0.6);
+  box-shadow:
+    0 0 30px rgba(74, 222, 128, 0.2),
+    0 0 80px rgba(74, 222, 128, 0.08),
+    inset 0 0 30px rgba(74, 222, 128, 0.05);
+  transform: translateY(-10px) scale(1.04);
+}
+
+#btn-easy:hover::after {
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(10,40,20,0.3) 40%, rgba(0,0,0,0.1) 100%);
+}
+
+#btn-easy:hover::before { left: 5%; right: 5%; box-shadow: 0 0 25px rgba(74, 222, 128, 0.6); }
+#btn-easy:hover .diff-card-label { color: #4ade80; text-shadow: 0 0 12px rgba(74, 222, 128, 0.5); }
+
+/* Medium — Orange/Amber */
+#btn-medium .diff-card-icon { color: #fbbf24; }
+#btn-medium::before { background: #fbbf24; box-shadow: 0 0 10px rgba(251, 191, 36, 0.3); }
+
+#btn-medium:hover {
+  border-color: rgba(251, 191, 36, 0.6);
+  box-shadow:
+    0 0 30px rgba(251, 191, 36, 0.2),
+    0 0 80px rgba(251, 191, 36, 0.08),
+    inset 0 0 30px rgba(251, 191, 36, 0.05);
+  transform: translateY(-10px) scale(1.04);
+}
+
+#btn-medium:hover::after {
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(40,30,10,0.3) 40%, rgba(0,0,0,0.1) 100%);
+}
+
+#btn-medium:hover::before { left: 5%; right: 5%; box-shadow: 0 0 25px rgba(251, 191, 36, 0.6); }
+#btn-medium:hover .diff-card-label { color: #fbbf24; text-shadow: 0 0 12px rgba(251, 191, 36, 0.5); }
+
+/* Hard — Red */
+#btn-hard .diff-card-icon { color: #f43f5e; }
+#btn-hard::before { background: #f43f5e; box-shadow: 0 0 10px rgba(244, 63, 94, 0.3); }
+
+#btn-hard:hover {
+  border-color: rgba(244, 63, 94, 0.6);
+  box-shadow:
+    0 0 30px rgba(244, 63, 94, 0.2),
+    0 0 80px rgba(244, 63, 94, 0.08),
+    inset 0 0 30px rgba(244, 63, 94, 0.05);
+  transform: translateY(-10px) scale(1.04);
+}
+
+#btn-hard:hover::after {
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(40,10,10,0.3) 40%, rgba(0,0,0,0.1) 100%);
+}
+
+#btn-hard:hover::before { left: 5%; right: 5%; box-shadow: 0 0 25px rgba(244, 63, 94, 0.6); }
+#btn-hard:hover .diff-card-label { color: #f43f5e; text-shadow: 0 0 12px rgba(244, 63, 94, 0.5); }
+
+/* Hover icon animation */
+.diff-card:hover .diff-card-icon {
+  transform: scale(1.2) rotate(-5deg);
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
+/* Active / Click state */
+.diff-card:active {
+  transform: translateY(-2px) scale(0.98);
+}
+
+/* ============================================
+   GAME CANVAS
+   ============================================ */
+
+/* Canvas — fullscreen, hidden by default */
+#gameCanvas {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 200;
+  background: #000;
+  cursor: none; /* Hide cursor during gameplay */
+}
+
+#gameCanvas.active {
+  display: block;
+}
+
+/* ============================================
+   HUD (Heads-Up Display) — Score & Lives
+   ============================================ */
+
+/* HUD container: sits on top of canvas */
+.game-hud {
+  display: none; /* Hidden by default, shown with canvas */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 210; /* Above canvas (200) */
+  padding: 20px 28px;
+  pointer-events: none; /* Allow clicks to pass through to canvas */
+  /* Layout: score left, lives right */
+  justify-content: space-between;
+  align-items: center;
+}
+
+.game-hud.active {
+  display: flex;
+}
+
+/* HUD Text Style */
+.hud-label {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(232, 234, 246, 0.7);
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+}
+
+.hud-value {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: var(--color-primary);
+  text-shadow: 0 0 10px var(--color-primary-glow);
+  margin-left: 0.5rem;
+}
+
+/* Score section */
+.hud-score {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* Lives section */
+.hud-lives {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lives-container {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/*
+  Life icon placeholders (red squares).
+  TODO: Replace with <img> tags pointing to heart.png.
+  When replaced, update .life-icon to style the <img> instead.
+*/
+.life-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background: #ff2d55;
+  border-radius: 3px;
+  box-shadow: 0 0 6px rgba(255, 45, 85, 0.5);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* When a life is lost, add .lost class */
+.life-icon.lost {
+  opacity: 0.2;
+  transform: scale(0.7);
+  background: #555;
+  box-shadow: none;
+}
+
+/* ============================================
+   PAUSE BUTTON (Bottom-left of HUD)
+   ============================================ */
+
+.pause-btn {
+  position: fixed;
+  bottom: 28px;
+  left: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: rgba(10, 14, 30, 0.6);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: 10px;
+  cursor: pointer;
+  pointer-events: auto; /* Override HUD pointer-events: none */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 215;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.pause-icon {
+  font-size: 1rem;
+  color: var(--color-text);
+  letter-spacing: 2px;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.pause-btn:hover {
+  background: rgba(0, 229, 255, 0.1);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 18px var(--color-primary-glow);
+  transform: scale(1.08);
+}
+
+.pause-btn:hover .pause-icon {
+  color: var(--color-primary);
+}
+
+.pause-btn:active {
+  transform: scale(0.95);
+}
+
+/* ============================================
+   PAUSE POP-UP MODAL
+   ============================================ */
+
+/* Overlay: dark backdrop covering entire screen */
+.pause-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 300; /* Above everything */
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Hidden by default */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.pause-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Pause Box (centered card) */
+.pause-box {
+  position: relative;
+  width: 360px;
+  max-width: 85vw;
+  padding: 2.5rem 2rem;
+  background: rgba(12, 16, 30, 0.95);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: 16px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 0 40px rgba(0, 229, 255, 0.08),
+    0 0 80px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  text-align: center;
+  /* Entry animation */
+  transform: scale(0.85);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pause-overlay.active .pause-box {
+  transform: scale(1);
+}
+
+/* Corner accents */
+.pause-box::before,
+.pause-box::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: var(--color-primary);
+}
+
+.pause-box::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+  border-radius: 16px 0 0 0;
+}
+
+.pause-box::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+  border-radius: 0 0 16px 0;
+}
+
+/* Pause Title */
+.pause-title {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  text-shadow: 0 0 15px var(--color-primary-glow);
+  margin-bottom: 1rem;
+}
+
+/* Decorative Divider */
+.pause-divider {
+  width: 100%;
+  height: 1px;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-primary),
+    var(--color-accent),
+    transparent
+  );
+  opacity: 0.4;
+}
+
+/* Buttons container */
+.pause-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+/* Action buttons (Resume / Quit) */
+.pause-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  width: 220px;
+  height: 50px;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.pause-btn-icon {
+  font-size: 0.9rem;
+  transition: transform var(--transition-fast);
+}
+
+.pause-action-btn:active {
+  transform: scale(0.96);
+}
+
+/* Resume button hover — cyan glow */
+.resume-btn:hover {
+  background: rgba(0, 229, 255, 0.08);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: 0 0 20px var(--color-primary-glow);
+}
+
+.resume-btn:hover .pause-btn-icon {
+  transform: translateX(2px);
+}
+
+/* Quit button hover — red glow */
+.quit-btn:hover {
+  background: rgba(255, 45, 85, 0.08);
+  border-color: #ff2d55;
+  color: #ff2d55;
+  box-shadow: 0 0 20px rgba(255, 45, 85, 0.3);
+}
+
+.quit-btn:hover .pause-btn-icon {
+  transform: rotate(90deg);
+}
+
+/* ============================================
+   GAME OVER POP-UP MODAL
+   ============================================ */
+
+.gameover-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 310;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.gameover-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.gameover-box {
+  position: relative;
+  width: 380px;
+  max-width: 85vw;
+  padding: 2.5rem 2rem;
+  background: rgba(12, 16, 30, 0.95);
+  border: 1px solid rgba(255, 45, 85, 0.3);
+  border-radius: 16px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 0 40px rgba(255, 45, 85, 0.1),
+    0 0 80px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  text-align: center;
+  transform: scale(0.85);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.gameover-overlay.active .gameover-box {
+  transform: scale(1);
+}
+
+/* Corner accents — red theme */
+.gameover-box::before,
+.gameover-box::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: #ff2d55;
+}
+
+.gameover-box::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid;
+  border-left: 2px solid;
+  border-radius: 16px 0 0 0;
+}
+
+.gameover-box::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid;
+  border-right: 2px solid;
+  border-radius: 0 0 16px 0;
+}
+
+.gameover-title {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #ff2d55;
+  text-shadow:
+    0 0 15px rgba(255, 45, 85, 0.5),
+    0 0 40px rgba(255, 45, 85, 0.2);
+  margin-bottom: 1rem;
+}
+
+.gameover-divider {
+  width: 100%;
+  height: 1px;
+  margin-bottom: 1.2rem;
+  background: linear-gradient(90deg, transparent, #ff2d55, #a855f7, transparent);
+  opacity: 0.4;
+}
+
+.gameover-score {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-text);
+  margin-bottom: 1.5rem;
+}
+
+.gameover-score span {
+  color: var(--color-primary);
+  font-size: 1.4rem;
+  text-shadow: 0 0 8px var(--color-primary-glow);
+}
+
+.gameover-buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+/* ===== Responsive Adjustments ===== */
+@media (max-width: 768px) {
+  .difficulty-cards {
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+
+  .diff-card {
+    width: 320px;
+    height: 140px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 1.2rem;
+    padding: 1.2rem 1.5rem;
+    border-radius: 16px;
+  }
+
+  .diff-card::after {
+    border-radius: 16px;
+    background: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 100%);
+  }
+
+  .diff-card-icon {
+    font-size: 2.5rem;
+  }
+
+  .diff-card-desc {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .menu-container {
+    padding-top: 15vh;
+  }
+
+  .menu-btn {
+    width: 260px;
+    height: 52px;
+    font-size: 0.95rem;
+  }
+
+  .game-subtitle {
+    letter-spacing: 0.3em;
+  }
+
+  .diff-card {
+    width: 280px;
+    height: 120px;
+  }
+
+  .back-btn {
+    width: 40px;
+    height: 40px;
+    left: 1rem;
+  }
+
+  .difficulty-title {
+    font-size: 1.2rem;
+  }
+}

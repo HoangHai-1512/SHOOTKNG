@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SHOOTKNG - A 2D Space Shooter Web Game">
+  <title>SHOOTKNG - Main Menu</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== Animated Stars Background ===== -->
+  <div class="stars-layer stars-small"></div>
+  <div class="stars-layer stars-medium"></div>
+  <div class="stars-layer stars-large"></div>
+
+  <!-- ===== Nebula Glow Overlay ===== -->
+  <div class="nebula-overlay"></div>
+
+  <!-- ===== Main Menu Container ===== -->
+  <main class="menu-container" id="menu-container">
+
+    <!-- Game Title -->
+    <h1 class="game-title" id="game-title">
+      <span class="title-main">SHOOT</span><span class="title-highlight">KNG</span>
+    </h1>
+    <p class="game-subtitle">SPACE WARFARE</p>
+
+    <!-- Navigation Buttons -->
+    <nav class="nav-buttons" id="nav-buttons">
+      <button class="menu-btn" id="btn-play">
+        <span class="btn-icon">&#9654;</span>
+        <span class="btn-text">Play</span>
+        <span class="btn-shine"></span>
+      </button>
+
+      <button class="menu-btn" id="btn-tutorial">
+        <span class="btn-icon">&#9881;</span>
+        <span class="btn-text">Tutorial</span>
+        <span class="btn-shine"></span>
+      </button>
+
+      <button class="menu-btn" id="btn-highscore">
+        <span class="btn-icon">&#9733;</span>
+        <span class="btn-text">Highest Score</span>
+        <span class="btn-shine"></span>
+      </button>
+    </nav>
+
+    <!-- Footer -->
+    <p class="menu-footer">&copy; 2026 SHOOTKNG. All rights reserved.</p>
+  </main>
+
+  <!-- ===== Tutorial Pop-up Modal ===== -->
+  <div class="modal-overlay" id="modal-tutorial">
+    <div class="modal-box">
+      <!-- Close Button -->
+      <button class="modal-close" id="close-tutorial" aria-label="Close Tutorial">&times;</button>
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <span class="modal-icon">&#9881;</span>
+        <h2 class="modal-title">Tutorial</h2>
+      </div>
+
+      <!-- Decorative Divider -->
+      <div class="modal-divider"></div>
+
+      <!-- Modal Content -->
+      <div class="modal-content">
+        <p class="modal-text">
+          Sử dụng chuột để di chuyển nhân vật. Vũ khí sẽ tự động khai hỏa.
+          Tránh né kẻ địch và ghi điểm cao nhất!
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Highest Score Pop-up Modal ===== -->
+  <div class="modal-overlay" id="modal-highscore">
+    <div class="modal-box">
+      <!-- Close Button -->
+      <button class="modal-close" id="close-highscore" aria-label="Close Highest Score">&times;</button>
+
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <span class="modal-icon">&#9733;</span>
+        <h2 class="modal-title">Highest Score</h2>
+      </div>
+
+      <!-- Decorative Divider -->
+      <div class="modal-divider"></div>
+
+      <div class="modal-content">
+        <ul id="highscore-list" class="score-list">
+          <!-- JS will render <li> items here -->
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Difficulty Selection Screen ===== -->
+  <section class="difficulty-screen" id="difficulty-screen">
+
+    <!-- Top Bar: Back Button + Title -->
+    <div class="difficulty-topbar">
+      <button class="back-btn" id="btn-back" aria-label="Back to Main Menu">
+        <span class="back-arrow">&larr;</span>
+      </button>
+      <h2 class="difficulty-title">Select Difficulty</h2>
+    </div>
+
+    <!-- Difficulty Cards (Horizontal layout matching wireframe) -->
+    <div class="difficulty-cards" id="difficulty-cards">
+
+      <button class="diff-card" id="btn-easy" data-difficulty="easy">
+        <span class="diff-card-icon">&#9786;</span>
+        <span class="diff-card-label">Easy</span>
+        <span class="diff-card-desc">Relaxed pace, fewer enemies</span>
+      </button>
+
+      <button class="diff-card" id="btn-medium" data-difficulty="medium">
+        <span class="diff-card-icon">&#9876;</span>
+        <span class="diff-card-label">Medium</span>
+        <span class="diff-card-desc">Balanced challenge</span>
+      </button>
+
+      <button class="diff-card" id="btn-hard" data-difficulty="hard">
+        <span class="diff-card-icon">&#9760;</span>
+        <span class="diff-card-label">Hard</span>
+        <span class="diff-card-desc">Intense action, no mercy</span>
+      </button>
+
+    </div>
+  </section>
+
+  <!-- ===== Game Canvas (Hidden by default) ===== -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- ===== HUD Overlay (Score & Lives — displayed on top of Canvas) ===== -->
+  <div class="game-hud" id="game-hud">
+
+    <!-- Score: Top-left corner -->
+    <div class="hud-score" id="hud-score">
+      <span class="hud-label">Score:</span>
+      <span class="hud-value" id="score-display">0</span>
+    </div>
+
+    <!-- Lives: Top-right corner -->
+    <div class="hud-lives" id="hud-lives">
+      <span class="hud-label">Lives:</span>
+      <div class="lives-container" id="lives-container">
+        <!--
+          TODO: Replace these <span> placeholders with <img> tags
+          pointing to your heart .png asset, e.g.:
+          <img src="./assets/heart.png" class="life-icon" alt="Life">
+        -->
+        <span class="life-icon" data-life="1"></span>
+        <span class="life-icon" data-life="2"></span>
+        <span class="life-icon" data-life="3"></span>
+      </div>
+    </div>
+
+    <!-- Pause Button: Bottom-left corner -->
+    <button class="pause-btn" id="btn-pause" aria-label="Pause Game">
+      <span class="pause-icon">&#9646;&#9646;</span>
+    </button>
+
+  </div>
+
+  <!-- ===== Pause Pop-up Modal ===== -->
+  <div class="pause-overlay" id="pause-overlay">
+    <div class="pause-box">
+
+      <!-- Pause Title -->
+      <h2 class="pause-title">Pause</h2>
+
+      <!-- Decorative Divider -->
+      <div class="pause-divider"></div>
+
+      <!-- Pause Action Buttons -->
+      <div class="pause-buttons">
+        <button class="pause-action-btn resume-btn" id="btn-resume">
+          <span class="pause-btn-icon">&#9654;</span>
+          <span>Resume</span>
+        </button>
+        <button class="pause-action-btn quit-btn" id="btn-quit">
+          <span class="pause-btn-icon">&#10005;</span>
+          <span>Quit</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== Game Over Pop-up Modal ===== -->
+  <div class="gameover-overlay" id="gameover-overlay">
+    <div class="gameover-box">
+
+      <!-- Game Over Title -->
+      <h2 class="gameover-title">Game Over</h2>
+
+      <!-- Decorative Divider -->
+      <div class="gameover-divider"></div>
+
+      <!-- Final Score -->
+      <p class="gameover-score">Your Score: <span id="final-score">0</span></p>
+
+      <!-- Action Buttons -->
+      <div class="gameover-buttons">
+        <button class="pause-action-btn resume-btn" id="btn-play-again">
+          <span class="pause-btn-icon">&#8635;</span>
+          <span>Play Again</span>
+        </button>
+        <button class="pause-action-btn quit-btn" id="btn-quit-gameover">
+          <span class="pause-btn-icon">&#10005;</span>
+          <span>Quit</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
