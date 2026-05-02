@@ -11,7 +11,30 @@ let isPaused = false;
 let animationFrameId = null;
 let autoShootInterval = null;
 let enemySpawnInterval = null;
+let powerupSpawnInterval = null;    // Timer for power-up spawning
 let difficultyLevel = 0;           // Increases every 10 points
+let bulletSoundCounter = 0;        // Counter for bullet sound frequency
+
+// ===== Power-up State =====
+let isSpeedUpActive = false;
+let isLaserActive = false;
+let isSlowActive = false;
+let isShieldActive = false;
+
+// Expiration timestamps
+let speedUpEndTime = 0;
+let laserEndTime = 0;
+let slowEndTime = 0;
+let shieldEndTime = 0;
+
+// Timeout handles to prevent overlapping/leaking effects
+let speedUpTimeout = null;
+let laserTimeout = null;
+let slowTimeout = null;
+let shieldTimeout = null;
+
+// DOM for Power-up HUD (fetched at runtime to ensure it exists)
+let powerupHud = null;
 
 // ===== Configurable Colors =====
 const BULLET_COLOR = '#00e5ff';
@@ -20,6 +43,121 @@ const PLAYER_BODY_COLOR = '#c0c8e0';
 const PLAYER_ACCENT_COLOR = '#00e5ff';
 const PLAYER_COCKPIT_COLOR = '#0a0e1a';
 const ENGINE_FLAME_COLOR = '#ff6b2b';
+
+// ============================================
+//  AUDIO MANAGER (Sound Pool System)
+// ============================================
+class SoundManager {
+  constructor() {
+    this.bgmVolume = 0.3;
+    this.sfxVolume = 0.6;
+    
+    // Store original Audio objects
+    this.sounds = {
+      menuBGM: new Audio('assets/sounds/menu_bgm.mp3'),
+      gameplayBGM: new Audio('assets/sounds/gameplay_bgm.mp3'),
+      hover: new Audio('assets/sounds/hover.mp3'),
+      click: new Audio('assets/sounds/click.mp3'),
+      close: new Audio('assets/sounds/close.mp3'),
+      shoot: new Audio('assets/sounds/shoot.mp3'),
+      hitEnemy: new Audio('assets/sounds/hit_enemy.mp3'),
+      playerHit: new Audio('assets/sounds/player_hit.mp3'),
+      powerUp: new Audio('assets/sounds/powerup.mp3'),
+      pause: new Audio('assets/sounds/pause.mp3'),
+      gameOver: new Audio('assets/sounds/gameover.mp3'),
+      laser: new Audio('assets/sounds/laser.mp3')
+    };
+
+    // Configure BGM
+    this.sounds.menuBGM.loop = true;
+    this.sounds.gameplayBGM.loop = true;
+    this.sounds.menuBGM.volume = 0.6;      // Increased menu BGM
+    this.sounds.gameplayBGM.volume = 0.8;  // Increased gameplay BGM
+
+    // Apply SFX volume
+    for (let key in this.sounds) {
+      if (key !== 'menuBGM' && key !== 'gameplayBGM') {
+        this.sounds[key].volume = this.sfxVolume;
+      }
+    }
+    
+    // Custom fine-tuning for specific SFX
+    this.sounds.hover.volume = 0.3; // Increased hover volume
+
+    // Audio Pool for overlapping sounds (e.g. shoot)
+    this.pools = {
+      shoot: []
+    };
+    // Pre-fill pool with 10 clones
+    for (let i = 0; i < 10; i++) {
+      let clone = this.sounds.shoot.cloneNode();
+      clone.volume = 0.05; // Decreased shoot volume even further
+      this.pools.shoot.push(clone);
+    }
+    this.poolIndices = { shoot: 0 };
+    
+    this.isMuted = false;
+  }
+
+  playBGM(name) {
+    if (this.isMuted) return;
+    const bgm = this.sounds[name];
+    if (bgm) {
+      bgm.currentTime = 0;
+      bgm.play().catch(e => console.warn('BGM auto-play blocked:', e));
+    }
+  }
+
+  pauseBGM(name) {
+    if (this.sounds[name]) {
+      this.sounds[name].pause();
+    }
+  }
+
+  playSFX(name) {
+    if (this.isMuted) return;
+    
+    // Use pool if it exists (for rapid overlapping sounds)
+    if (this.pools[name]) {
+      const pool = this.pools[name];
+      const idx = this.poolIndices[name];
+      const sound = pool[idx];
+      sound.currentTime = 0;
+      sound.play().catch(e => console.warn('SFX play blocked:', e));
+      this.poolIndices[name] = (idx + 1) % pool.length;
+    } 
+    // Otherwise play normal sound
+    else if (this.sounds[name]) {
+      const sound = this.sounds[name];
+      sound.currentTime = 0;
+      sound.play().catch(e => console.warn('SFX play blocked:', e));
+    }
+  }
+
+  stopSFX(name) {
+    if (this.sounds[name]) {
+      this.sounds[name].pause();
+      this.sounds[name].currentTime = 0;
+    }
+  }
+}
+
+const audioManager = new SoundManager();
+
+// Auto-play Policy Handler
+let hasInteracted = false;
+function initAudioOnInteraction() {
+  if (hasInteracted) return;
+  hasInteracted = true;
+  // Start menu BGM only if we are not already in game
+  if (!gameRunning) {
+    audioManager.playBGM('menuBGM');
+  }
+  document.removeEventListener('click', initAudioOnInteraction);
+  document.removeEventListener('keydown', initAudioOnInteraction);
+}
+document.addEventListener('click', initAudioOnInteraction);
+document.addEventListener('keydown', initAudioOnInteraction);
 
 // ===== Base Config per Difficulty (intentionally SLOW at start) =====
 const BASE_SHOOT_RATE = { easy: 500, medium: 400, hard: 280 };
@@ -87,6 +225,7 @@ const ctx = gameCanvas.getContext('2d');
 // ===== Game Object Arrays =====
 let bullets = [];
 let enemies = [];
+let powerups = [];
 let explosions = [];  // Explosion particle effects
 let stars = [];
 let player = null;
@@ -116,22 +255,32 @@ function updateLivesDisplay() {
   });
 }
 
-/** Returns current enemy speed factoring in dynamic difficulty */
+/** Returns current enemy speed factoring in dynamic difficulty (Base speed only) */
 function getEnemySpeed() {
   const base = BASE_ENEMY_SPEED[currentDifficulty] || 1.2;
   return base * (1 + difficultyLevel * ENEMY_SCALE_FACTOR);
 }
 
-/** Returns current spawn interval (ms) factoring in dynamic difficulty */
+/** Returns current spawn interval (ms) factoring in dynamic difficulty and Slow Down */
 function getSpawnRate() {
   const base = BASE_SPAWN_RATE[currentDifficulty] || 1500;
-  return Math.max(250, base / (1 + difficultyLevel * ENEMY_SCALE_FACTOR));
+  let rate = base / (1 + difficultyLevel * ENEMY_SCALE_FACTOR);
+  
+  // If Slow Down is active, enemies spawn slower
+  if (isSlowActive) rate *= 2;
+  
+  return Math.max(250, rate);
 }
 
-/** Returns current shoot interval (ms) factoring in dynamic difficulty */
+/** Returns current shoot interval (ms) factoring in dynamic difficulty and Speed Up */
 function getShootRate() {
   const base = BASE_SHOOT_RATE[currentDifficulty] || 400;
-  return Math.max(80, base / (1 + difficultyLevel * PLAYER_SCALE_FACTOR));
+  let rate = base / (1 + difficultyLevel * PLAYER_SCALE_FACTOR);
+  
+  // Speed Up power-up: 2x faster firing rate (Adjusted from 4x)
+  if (isSpeedUpActive) rate *= 0.5;
+  
+  return Math.max(50, rate);
 }
 
 /** How many meteors to spawn per wave based on current score and difficulty */
@@ -319,7 +468,8 @@ class Enemy {
     this.radius = 15 + Math.random() * 25;  // 15-40px
     this.x = this.radius + Math.random() * (canvasWidth - this.radius * 2);
     this.y = -this.radius;
-    this.speed = getEnemySpeed() + Math.random() * 0.8;
+    this.baseSpeed = getEnemySpeed() + Math.random() * 0.8;
+    this.speed = this.baseSpeed;
     this.rotation = Math.random() * Math.PI * 2;
     this.rotSpeed = (Math.random() - 0.5) * 0.03;
     this.active = true;
@@ -357,6 +507,7 @@ class Enemy {
   }
 
   update() {
+    this.speed = isSlowActive ? this.baseSpeed * 0.4 : this.baseSpeed;
     this.y += this.speed;
     this.rotation += this.rotSpeed;
     if (this.flashTimer > 0) this.flashTimer--;
@@ -454,8 +605,263 @@ class Explosion {
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
+    ctx.restore();
     ctx.globalAlpha = 1;
   }
+}
+
+// ============================================
+//  POWER-UP CLASS
+// ============================================
+class PowerUp {
+  constructor(canvasWidth) {
+    this.radius = 20;
+    this.x = this.radius + Math.random() * (canvasWidth - this.radius * 2);
+    this.y = -this.radius;
+    this.baseSpeed = BASE_ENEMY_SPEED[currentDifficulty] || 1.5;
+    this.speed = this.baseSpeed;
+    this.hp = 3;
+    this.active = true;
+
+    // Pick random type
+    const types = ['speed', 'laser', 'slow', 'life', 'shield'];
+    this.type = types[Math.floor(Math.random() * types.length)];
+    
+    // Visual config
+    switch(this.type) {
+      case 'speed': this.color = '#fbbf24'; this.label = 'S'; break; // Yellow
+      case 'laser': this.color = '#ef4444'; this.label = 'L'; break; // Red
+      case 'slow':  this.color = '#3b82f6'; this.label = 'D'; break; // Blue
+      case 'life':  this.color = '#10b981'; this.label = '+'; break; // Green
+      case 'shield':this.color = '#7dd3fc'; this.label = 'O'; break; // Pastel Blue
+    }
+  }
+
+  update() {
+    this.speed = isSlowActive ? this.baseSpeed * 0.4 : this.baseSpeed;
+    this.y += this.speed;
+    if (this.y - this.radius > gameCanvas.height) this.active = false;
+  }
+
+  draw() {
+    ctx.save();
+    
+    // Outer glow
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = this.color;
+    
+    // Sphere
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(10, 14, 30, 0.8)';
+    ctx.fill();
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // Icon Label
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = this.color;
+    ctx.font = `900 ${this.radius}px var(--font-display)`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.label, this.x, this.y + 1);
+    
+    // HP Pips (small dots to show 3 lives)
+    for(let i=0; i<3; i++) {
+      ctx.beginPath();
+      ctx.arc(this.x - 10 + i*10, this.y + this.radius + 8, 3, 0, Math.PI * 2);
+      ctx.fillStyle = (i < this.hp) ? this.color : '#333';
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  activate() {
+    this.active = false;
+    if (this.type !== 'laser') {
+      audioManager.playSFX('powerUp');
+    }
+    explosions.push(new Explosion(this.x, this.y, 25, this.color));
+    
+    if (this.type === 'speed') activateSpeedUp();
+    else if (this.type === 'laser') activateLaser();
+    else if (this.type === 'slow') activateSlowDown();
+    else if (this.type === 'life') activateExtraLife();
+    else if (this.type === 'shield') activateShield();
+  }
+}
+
+/** 5s of rapid fire (Adjusted duration and speed) */
+function activateSpeedUp() {
+  isSpeedUpActive = true;
+  speedUpEndTime = Date.now() + 5000;
+  if (speedUpTimeout) clearTimeout(speedUpTimeout);
+  console.log("POWER-UP: SPEED UP!");
+  
+  // Refresh auto-shoot with new speed
+  escalateDifficulty(); 
+  
+  speedUpTimeout = setTimeout(() => {
+    isSpeedUpActive = false;
+    speedUpEndTime = 0;
+    escalateDifficulty(); // Reset rate
+    console.log("SPEED UP expired.");
+  }, 5000);
+}
+
+/** 3s of mass destruction (Adjusted duration) */
+function activateLaser() {
+  isLaserActive = true;
+  laserEndTime = Date.now() + 3000;
+  if (laserTimeout) { clearTimeout(laserTimeout); audioManager.stopSFX('laser'); }
+  console.log("POWER-UP: LASER!");
+  
+  audioManager.playSFX('laser');
+  
+  laserTimeout = setTimeout(() => {
+    isLaserActive = false;
+    laserEndTime = 0;
+    audioManager.stopSFX('laser');
+    console.log("LASER expired.");
+  }, 3000);
+}
+
+/** 5s of slowed time */
+function activateSlowDown() {
+  isSlowActive = true;
+  slowEndTime = Date.now() + 5000;
+  if (slowTimeout) clearTimeout(slowTimeout);
+  console.log("POWER-UP: SLOW DOWN!");
+  
+  escalateDifficulty(); // Apply slower spawn rate immediately
+  
+  slowTimeout = setTimeout(() => {
+    isSlowActive = false;
+    slowEndTime = 0;
+    escalateDifficulty(); // Revert back to normal spawn rate
+    console.log("SLOW DOWN expired.");
+  }, 5000);
+}
+
+/** Adds 1 life (max 3) */
+function activateExtraLife() {
+  console.log("POWER-UP: EXTRA LIFE!");
+  if (lives < 3) {
+    lives++;
+    updateLivesDisplay();
+  }
+}
+
+/** 3s of invulnerability */
+function activateShield() {
+  isShieldActive = true;
+  shieldEndTime = Date.now() + 3000;
+  if (shieldTimeout) clearTimeout(shieldTimeout);
+  console.log("POWER-UP: SHIELD!");
+  
+  shieldTimeout = setTimeout(() => {
+    isShieldActive = false;
+    shieldEndTime = 0;
+    console.log("SHIELD expired.");
+  }, 3000);
+}
+
+/**
+ * Updates the Power-up HUD with countdown timers.
+ */
+function updatePowerUpHUD() {
+  if (!powerupHud) powerupHud = document.getElementById('powerup-hud');
+  if (!powerupHud) return;
+  
+  const now = Date.now();
+  
+  updateOrRemoveBadge('speed', 'Speed Up', isSpeedUpActive, speedUpEndTime, now);
+  updateOrRemoveBadge('laser', 'Laser Beam', isLaserActive, laserEndTime, now);
+  updateOrRemoveBadge('slow', 'Slow Motion', isSlowActive, slowEndTime, now);
+  updateOrRemoveBadge('shield', 'Shield', isShieldActive, shieldEndTime, now);
+}
+
+function updateOrRemoveBadge(type, label, isActive, endTime, now) {
+  let badge = document.getElementById(`pu-badge-${type}`);
+  
+  if (isActive && endTime > now) {
+    const remaining = ((endTime - now) / 1000).toFixed(1);
+    if (!badge) {
+      // Create new badge
+      badge = document.createElement('div');
+      badge.id = `pu-badge-${type}`;
+      badge.className = `pu-badge ${type}`;
+      badge.innerHTML = `<span>${label}</span> <span class="pu-timer" id="pu-timer-${type}">${remaining}s</span>`;
+      powerupHud.appendChild(badge);
+    } else {
+      // Update existing timer text
+      document.getElementById(`pu-timer-${type}`).textContent = `${remaining}s`;
+    }
+  } else if (badge) {
+    // Remove badge if expired
+    badge.remove();
+  }
+}
+
+function drawLaser() {
+  if (!isLaserActive || !player) return;
+  const tip = player.getBarrelTip();
+  
+  ctx.save();
+  // Outer Beam (Wide & Transparent)
+  ctx.shadowBlur = 25;
+  ctx.shadowColor = '#ef4444';
+  ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+  ctx.fillRect(tip.x - 15, 0, 30, tip.y);
+  
+  // Core Beam (Narrow & Bright)
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(tip.x - 4, 0, 8, tip.y);
+  
+  // Spark at tip
+  ctx.beginPath();
+  ctx.arc(tip.x, tip.y, 10 + Math.random()*5, 0, Math.PI*2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  
+  ctx.restore();
+}
+
+function drawShield() {
+  if (!isShieldActive || !player) return;
+  const pc = player.getCenter();
+  const remaining = shieldEndTime - Date.now();
+  if (remaining <= 0) return;
+  
+  let alpha = 0.8;
+  // Blinking effect in the last 1000ms
+  if (remaining <= 1000) {
+    alpha = (Math.floor(remaining / 100) % 2 === 0) ? 0.8 : 0.1;
+  }
+  
+  const r = player.hitRadius + 25;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(pc.x, pc.y, r, 0, Math.PI * 2);
+  
+  // 3D bubble effect using radial gradient
+  const grad = ctx.createRadialGradient(pc.x - r * 0.3, pc.y - r * 0.3, r * 0.1, pc.x, pc.y, r);
+  grad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.9})`); // Specular highlight
+  grad.addColorStop(0.3, `rgba(125, 211, 252, ${alpha * 0.2})`); // Transparent middle
+  grad.addColorStop(0.8, `rgba(125, 211, 252, ${alpha * 0.5})`); // Inner edge
+  grad.addColorStop(1, `rgba(125, 211, 252, ${alpha * 0.8})`); // Outer solid edge
+  
+  ctx.fillStyle = grad;
+  ctx.fill();
+  
+  ctx.strokeStyle = `rgba(125, 211, 252, ${alpha})`;
+  ctx.lineWidth = 2;
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = '#7dd3fc';
+  ctx.stroke();
+  ctx.restore();
 }
 
 // ============================================
@@ -464,6 +870,32 @@ class Explosion {
 function checkCollisions() {
   const pc = player.getCenter();
 
+  // --- LASER COLLISION (Enemy & PowerUp) ---
+  if (isLaserActive && player) {
+    const laserX = player.getBarrelTip().x;
+    
+    // 1. Laser vs Enemies
+    for (let e of enemies) {
+      if (e.active && Math.abs(e.x - laserX) < e.radius + 15) {
+        e.active = false;
+        audioManager.playSFX('hitEnemy');
+        explosions.push(new Explosion(e.x, e.y, e.radius, '#ff6b2b'));
+        score += e.maxHp;
+        updateScoreDisplay();
+        if (score % 10 === 0) escalateDifficulty();
+      }
+    }
+    
+    // 2. Laser vs PowerUps
+    for (let pu of powerups) {
+      if (pu.active && Math.abs(pu.x - laserX) < pu.radius + 15) {
+        pu.hp = 0;
+        pu.activate(); // Instantly destroy and activate
+      }
+    }
+  }
+
+  // --- Enemy Collisions ---
   for (let ei = enemies.length - 1; ei >= 0; ei--) {
     const e = enemies[ei];
     if (!e.active) continue;
@@ -479,15 +911,12 @@ function checkCollisions() {
 
       if (dist < e.radius + 4) {
         b.active = false;
-
-        // Small hit explosion (sparks)
+        audioManager.playSFX('hitEnemy');
         explosions.push(new Explosion(b.x, b.y, 8, '#ffcc44'));
 
         const destroyed = e.takeDamage();
         if (destroyed) {
-          // Big explosion on death
           explosions.push(new Explosion(e.x, e.y, e.radius, '#ff6b2b'));
-          // Score = maxHp: small=1pt, medium=2pt, large=3pt
           score += e.maxHp;
           updateScoreDisplay();
           if (score % 10 === 0) escalateDifficulty();
@@ -504,11 +933,41 @@ function checkCollisions() {
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     if (dist < e.radius + player.hitRadius) {
-      explosions.push(new Explosion(e.x, e.y, e.radius, '#ff2d55'));
-      e.active = false;
-      lives--;
-      updateLivesDisplay();
-      if (lives <= 0) { triggerGameOver(); return; }
+      if (isShieldActive) {
+        // Shield destroys enemy, protects player
+        audioManager.playSFX('hitEnemy');
+        explosions.push(new Explosion(e.x, e.y, e.radius, '#a855f7'));
+        e.active = false;
+        score += e.maxHp;
+        updateScoreDisplay();
+        if (score % 10 === 0) escalateDifficulty();
+      } else {
+        audioManager.playSFX('playerHit');
+        explosions.push(new Explosion(e.x, e.y, e.radius, '#ff2d55'));
+        e.active = false;
+        lives--;
+        updateLivesDisplay();
+        if (lives <= 0) { triggerGameOver(); return; }
+      }
+    }
+  }
+
+  // --- PowerUp Collisions (Bullet only) ---
+  for (let pu of powerups) {
+    if (!pu.active) continue;
+    
+    for (let b of bullets) {
+      if (!b.active) continue;
+      const dx = b.x - pu.x;
+      const dy = b.y - pu.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < pu.radius + 5) {
+        b.active = false;
+        pu.hp--;
+        explosions.push(new Explosion(b.x, b.y, 10, pu.color));
+        if (pu.hp <= 0) pu.activate();
+      }
     }
   }
 }
@@ -519,11 +978,23 @@ function checkCollisions() {
 
 function triggerGameOver() {
   gameRunning = false;
+  
+  audioManager.pauseBGM('gameplayBGM');
+  audioManager.playSFX('gameOver');
 
   // Stop intervals
   if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
   if (autoShootInterval) { clearInterval(autoShootInterval); autoShootInterval = null; }
   if (enemySpawnInterval) { clearInterval(enemySpawnInterval); enemySpawnInterval = null; }
+  if (powerupSpawnInterval) { clearInterval(powerupSpawnInterval); powerupSpawnInterval = null; }
+
+  // Clear power-up timers
+  if (speedUpTimeout) clearTimeout(speedUpTimeout);
+  if (laserTimeout) { clearTimeout(laserTimeout); audioManager.stopSFX('laser'); }
+  if (slowTimeout) clearTimeout(slowTimeout);
+  if (shieldTimeout) clearTimeout(shieldTimeout);
+  isSpeedUpActive = isLaserActive = isSlowActive = isShieldActive = false;
+  speedUpEndTime = laserEndTime = slowEndTime = shieldEndTime = 0;
 
   // Save score to local storage (Top 5 system)
   saveHighScore(score);
@@ -575,12 +1046,11 @@ function renderHighScores() {
   });
 }
 
-/** Resets game state and restarts with the same difficulty. */
+/** Returns to the difficulty selection screen to start a new game. */
 function playAgain() {
-  gameoverOverlay.classList.remove('active');
-  // initGame handles all resetting
-  gameRunning = true;
-  initGame();
+  quitGame();
+  menuContainer.style.display = 'none';
+  showScreen(difficultyScreen);
 }
 
 /** Quits from Game Over screen back to Main Menu. */
@@ -594,9 +1064,17 @@ function quitFromGameover() {
 // ============================================
 
 function spawnBullet() {
-  if (!player || !gameRunning || isPaused) return;
+  if (!player || !gameRunning || isPaused || isLaserActive) return;
   const tip = player.getBarrelTip();
   bullets.push(new Bullet(tip.x, tip.y));
+  
+  // Frequency of sound: normally 1 in 2 shots, with SpeedUp 1 in 4 shots
+  bulletSoundCounter++;
+  const threshold = isSpeedUpActive ? 4 : 2;
+  if (bulletSoundCounter >= threshold) {
+    audioManager.playSFX('shoot');
+    bulletSoundCounter = 0;
+  }
 }
 
 function spawnEnemy() {
@@ -607,6 +1085,14 @@ function spawnEnemy() {
   }
 }
 
+function spawnPowerUp() {
+  if (!gameRunning || isPaused) return;
+  // Only spawn on Medium and Hard
+  if (currentDifficulty === 'medium' || currentDifficulty === 'hard') {
+    powerups.push(new PowerUp(gameCanvas.width));
+  }
+}
+
 // ============================================
 //  GAME INITIALIZATION
 // ============================================
@@ -614,10 +1100,16 @@ function spawnEnemy() {
 function initGame() {
   resizeCanvas();
   score = 0; lives = 3;
-  bullets = []; enemies = []; explosions = [];
+  bullets = []; enemies = []; powerups = []; explosions = [];
   isPaused = false;
   difficultyLevel = 0;
+  isSpeedUpActive = isLaserActive = isSlowActive = isShieldActive = false;
+  speedUpEndTime = laserEndTime = slowEndTime = shieldEndTime = 0;
+  if (powerupHud) powerupHud.innerHTML = '';
   gameRunning = true;
+  
+  audioManager.pauseBGM('menuBGM');
+  audioManager.playBGM('gameplayBGM');
 
   updateScoreDisplay();
   updateLivesDisplay();
@@ -635,6 +1127,9 @@ function initGame() {
 
   // Start enemy spawning
   enemySpawnInterval = setInterval(spawnEnemy, getSpawnRate());
+  
+  // Start Power-up spawning (every 5s)
+  powerupSpawnInterval = setInterval(spawnPowerUp, 5000);
 
   console.log('Game Started — difficulty: ' + currentDifficulty);
   gameLoop();
@@ -674,27 +1169,37 @@ function gameLoop() {
     // 5. Update enemies
     for (const e of enemies) e.update();
 
-    // 6. Update explosions
+    // 6. Update powerups
+    for (const pu of powerups) pu.update();
+
+    // 7. Update explosions
     for (const ex of explosions) ex.update();
 
-    // 7. Collision detection
+    // 8. Collision detection
     checkCollisions();
     if (!gameRunning) return;
 
-    // 8. Cleanup
+    // 9. Cleanup
     bullets = bullets.filter(b => b.active);
     enemies = enemies.filter(e => e.active);
+    powerups = powerups.filter(pu => pu.active);
     explosions = explosions.filter(ex => ex.active);
+
+    // 10. Update HUD (Timers)
+    updatePowerUpHUD();
   }
   // ===== END PAUSE GATE =====
 
-  // 9. Draw everything (even when paused for frozen frame)
+  // 11. Draw everything
   player.draw();
+  drawShield(); // Draw shield if active
+  drawLaser(); // Draw laser beam if active
   for (const b of bullets) b.draw();
   for (const e of enemies) e.draw();
+  for (const pu of powerups) pu.draw();
   for (const ex of explosions) ex.draw();
 
-  // 10. Next frame
+  // 12. Next frame
   animationFrameId = requestAnimationFrame(gameLoop);
 }
 
@@ -743,6 +1248,7 @@ function pauseGame() {
   isPaused = true;
   pauseOverlay.classList.add('active');
   gameCanvas.style.cursor = 'default';
+  audioManager.playSFX('pause');
 }
 
 function resumeGame() {
@@ -750,6 +1256,7 @@ function resumeGame() {
   isPaused = false;
   pauseOverlay.classList.remove('active');
   gameCanvas.style.cursor = 'none';
+  audioManager.playSFX('click');
 }
 
 function quitGame() {
@@ -757,9 +1264,19 @@ function quitGame() {
   if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
   if (autoShootInterval) { clearInterval(autoShootInterval); autoShootInterval = null; }
   if (enemySpawnInterval) { clearInterval(enemySpawnInterval); enemySpawnInterval = null; }
+  if (powerupSpawnInterval) { clearInterval(powerupSpawnInterval); powerupSpawnInterval = null; }
+  
+  if (speedUpTimeout) clearTimeout(speedUpTimeout);
+  if (laserTimeout) { clearTimeout(laserTimeout); audioManager.stopSFX('laser'); }
+  if (slowTimeout) clearTimeout(slowTimeout);
+  if (shieldTimeout) clearTimeout(shieldTimeout);
+  isSpeedUpActive = isLaserActive = isSlowActive = isShieldActive = false;
+  speedUpEndTime = laserEndTime = slowEndTime = shieldEndTime = 0;
+  if (powerupHud) powerupHud.innerHTML = '';
+
   gameCanvas.removeEventListener('mousemove', onMouseMove);
 
-  score = 0; lives = 3; bullets = []; enemies = []; explosions = []; stars = [];
+  score = 0; lives = 3; bullets = []; enemies = []; powerups = []; explosions = []; stars = [];
   player = null; currentDifficulty = ''; difficultyLevel = 0;
 
   pauseOverlay.classList.remove('active');
@@ -767,6 +1284,9 @@ function quitGame() {
   hideScreen(gameCanvas); hideScreen(gameHud);
   gameCanvas.style.cursor = 'default';
   menuContainer.style.display = 'flex';
+  
+  audioManager.pauseBGM('gameplayBGM');
+  audioManager.playBGM('menuBGM');
 }
 
 btnPause.addEventListener('click', () => pauseGame());
@@ -782,3 +1302,18 @@ window.addEventListener('keydown', (e) => {
 });
 
 window.addEventListener('resize', resizeCanvas);
+
+// ============================================
+//  UI AUDIO SETUP
+// ============================================
+const uiButtons = document.querySelectorAll('.menu-btn, .diff-card, .pause-btn, .pause-action-btn, .modal-close');
+uiButtons.forEach(btn => {
+  btn.addEventListener('mouseenter', () => audioManager.playSFX('hover'));
+  btn.addEventListener('click', () => {
+    if (btn.classList.contains('modal-close')) {
+      audioManager.playSFX('close');
+    } else {
+      audioManager.playSFX('click');
+    }
+  });
+});
