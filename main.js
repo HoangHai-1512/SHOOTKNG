@@ -15,6 +15,11 @@ let powerupSpawnInterval = null;    // Timer for power-up spawning
 let difficultyLevel = 0;           // Increases every 10 points
 let bulletSoundCounter = 0;        // Counter for bullet sound frequency
 
+// ===== Boss State =====
+let boss = null;
+let bossPhase = 0; // 0: normal, 1: waiting for clear, 2: active
+let bossDefeatedCount = 0;
+
 // ===== Power-up State =====
 let isSpeedUpActive = false;
 let isLaserActive = false;
@@ -51,7 +56,7 @@ class SoundManager {
   constructor() {
     this.bgmVolume = 0.3;
     this.sfxVolume = 0.6;
-    
+
     // Store original Audio objects
     this.sounds = {
       menuBGM: new Audio('assets/sounds/menu_bgm.mp3'),
@@ -80,7 +85,7 @@ class SoundManager {
         this.sounds[key].volume = this.sfxVolume;
       }
     }
-    
+
     // Custom fine-tuning for specific SFX
     this.sounds.hover.volume = 0.3; // Increased hover volume
 
@@ -95,7 +100,7 @@ class SoundManager {
       this.pools.shoot.push(clone);
     }
     this.poolIndices = { shoot: 0 };
-    
+
     this.isMuted = false;
   }
 
@@ -116,7 +121,7 @@ class SoundManager {
 
   playSFX(name) {
     if (this.isMuted) return;
-    
+
     // Use pool if it exists (for rapid overlapping sounds)
     if (this.pools[name]) {
       const pool = this.pools[name];
@@ -125,7 +130,7 @@ class SoundManager {
       sound.currentTime = 0;
       sound.play().catch(e => console.warn('SFX play blocked:', e));
       this.poolIndices[name] = (idx + 1) % pool.length;
-    } 
+    }
     // Otherwise play normal sound
     else if (this.sounds[name]) {
       const sound = this.sounds[name];
@@ -166,8 +171,8 @@ const BASE_ENEMY_SPEED = { easy: 0.8, medium: 1.2, hard: 2.0 };
 const BASE_SPAWN_RATE = { easy: 2000, medium: 1500, hard: 1000 };
 
 // Dynamic difficulty multiplier constants
-const ENEMY_SCALE_FACTOR = 0.10;    // 10% harder per level
-const PLAYER_SCALE_FACTOR = 0.06;   // 6% stronger per level (6/10 ratio)
+const ENEMY_SCALE_FACTOR = 0.04;    // 4% harder per level
+const PLAYER_SCALE_FACTOR = 0.02;   // 2% stronger per level
 
 // Wave spawn thresholds per difficulty
 // Medium & Hard: +1 meteor at each milestone
@@ -265,10 +270,10 @@ function getEnemySpeed() {
 function getSpawnRate() {
   const base = BASE_SPAWN_RATE[currentDifficulty] || 1500;
   let rate = base / (1 + difficultyLevel * ENEMY_SCALE_FACTOR);
-  
+
   // If Slow Down is active, enemies spawn slower
   if (isSlowActive) rate *= 2;
-  
+
   return Math.max(250, rate);
 }
 
@@ -276,10 +281,10 @@ function getSpawnRate() {
 function getShootRate() {
   const base = BASE_SHOOT_RATE[currentDifficulty] || 400;
   let rate = base / (1 + difficultyLevel * PLAYER_SCALE_FACTOR);
-  
+
   // Speed Up power-up: 2x faster firing rate (Adjusted from 4x)
   if (isSpeedUpActive) rate *= 0.5;
-  
+
   return Math.max(50, rate);
 }
 
@@ -301,7 +306,9 @@ function escalateDifficulty() {
   difficultyLevel = Math.floor(score / 10);
 
   if (enemySpawnInterval) clearInterval(enemySpawnInterval);
-  enemySpawnInterval = setInterval(spawnEnemy, getSpawnRate());
+  if (bossPhase === 0) {
+    enemySpawnInterval = setInterval(spawnEnemy, getSpawnRate());
+  }
 
   if (autoShootInterval) clearInterval(autoShootInterval);
   autoShootInterval = setInterval(spawnBullet, getShootRate());
@@ -626,14 +633,14 @@ class PowerUp {
     // Pick random type
     const types = ['speed', 'laser', 'slow', 'life', 'shield'];
     this.type = types[Math.floor(Math.random() * types.length)];
-    
+
     // Visual config
-    switch(this.type) {
+    switch (this.type) {
       case 'speed': this.color = '#fbbf24'; this.label = 'S'; break; // Yellow
       case 'laser': this.color = '#ef4444'; this.label = 'L'; break; // Red
-      case 'slow':  this.color = '#3b82f6'; this.label = 'D'; break; // Blue
-      case 'life':  this.color = '#10b981'; this.label = '+'; break; // Green
-      case 'shield':this.color = '#7dd3fc'; this.label = 'O'; break; // Pastel Blue
+      case 'slow': this.color = '#3b82f6'; this.label = 'D'; break; // Blue
+      case 'life': this.color = '#10b981'; this.label = '+'; break; // Green
+      case 'shield': this.color = '#7dd3fc'; this.label = 'O'; break; // Pastel Blue
     }
   }
 
@@ -645,11 +652,11 @@ class PowerUp {
 
   draw() {
     ctx.save();
-    
+
     // Outer glow
     ctx.shadowBlur = 15;
     ctx.shadowColor = this.color;
-    
+
     // Sphere
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
@@ -658,7 +665,7 @@ class PowerUp {
     ctx.strokeStyle = this.color;
     ctx.lineWidth = 3;
     ctx.stroke();
-    
+
     // Icon Label
     ctx.shadowBlur = 0;
     ctx.fillStyle = this.color;
@@ -666,11 +673,11 @@ class PowerUp {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(this.label, this.x, this.y + 1);
-    
+
     // HP Pips (small dots to show 3 lives)
-    for(let i=0; i<3; i++) {
+    for (let i = 0; i < 3; i++) {
       ctx.beginPath();
-      ctx.arc(this.x - 10 + i*10, this.y + this.radius + 8, 3, 0, Math.PI * 2);
+      ctx.arc(this.x - 10 + i * 10, this.y + this.radius + 8, 3, 0, Math.PI * 2);
       ctx.fillStyle = (i < this.hp) ? this.color : '#333';
       ctx.fill();
     }
@@ -684,7 +691,7 @@ class PowerUp {
       audioManager.playSFX('powerUp');
     }
     explosions.push(new Explosion(this.x, this.y, 25, this.color));
-    
+
     if (this.type === 'speed') activateSpeedUp();
     else if (this.type === 'laser') activateLaser();
     else if (this.type === 'slow') activateSlowDown();
@@ -699,10 +706,10 @@ function activateSpeedUp() {
   speedUpEndTime = Date.now() + 5000;
   if (speedUpTimeout) clearTimeout(speedUpTimeout);
   console.log("POWER-UP: SPEED UP!");
-  
+
   // Refresh auto-shoot with new speed
-  escalateDifficulty(); 
-  
+  escalateDifficulty();
+
   speedUpTimeout = setTimeout(() => {
     isSpeedUpActive = false;
     speedUpEndTime = 0;
@@ -717,9 +724,9 @@ function activateLaser() {
   laserEndTime = Date.now() + 3000;
   if (laserTimeout) { clearTimeout(laserTimeout); audioManager.stopSFX('laser'); }
   console.log("POWER-UP: LASER!");
-  
+
   audioManager.playSFX('laser');
-  
+
   laserTimeout = setTimeout(() => {
     isLaserActive = false;
     laserEndTime = 0;
@@ -734,9 +741,9 @@ function activateSlowDown() {
   slowEndTime = Date.now() + 5000;
   if (slowTimeout) clearTimeout(slowTimeout);
   console.log("POWER-UP: SLOW DOWN!");
-  
+
   escalateDifficulty(); // Apply slower spawn rate immediately
-  
+
   slowTimeout = setTimeout(() => {
     isSlowActive = false;
     slowEndTime = 0;
@@ -760,7 +767,7 @@ function activateShield() {
   shieldEndTime = Date.now() + 3000;
   if (shieldTimeout) clearTimeout(shieldTimeout);
   console.log("POWER-UP: SHIELD!");
-  
+
   shieldTimeout = setTimeout(() => {
     isShieldActive = false;
     shieldEndTime = 0;
@@ -774,9 +781,9 @@ function activateShield() {
 function updatePowerUpHUD() {
   if (!powerupHud) powerupHud = document.getElementById('powerup-hud');
   if (!powerupHud) return;
-  
+
   const now = Date.now();
-  
+
   updateOrRemoveBadge('speed', 'Speed Up', isSpeedUpActive, speedUpEndTime, now);
   updateOrRemoveBadge('laser', 'Laser Beam', isLaserActive, laserEndTime, now);
   updateOrRemoveBadge('slow', 'Slow Motion', isSlowActive, slowEndTime, now);
@@ -785,7 +792,7 @@ function updatePowerUpHUD() {
 
 function updateOrRemoveBadge(type, label, isActive, endTime, now) {
   let badge = document.getElementById(`pu-badge-${type}`);
-  
+
   if (isActive && endTime > now) {
     const remaining = ((endTime - now) / 1000).toFixed(1);
     if (!badge) {
@@ -808,24 +815,24 @@ function updateOrRemoveBadge(type, label, isActive, endTime, now) {
 function drawLaser() {
   if (!isLaserActive || !player) return;
   const tip = player.getBarrelTip();
-  
+
   ctx.save();
   // Outer Beam (Wide & Transparent)
   ctx.shadowBlur = 25;
   ctx.shadowColor = '#ef4444';
   ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
   ctx.fillRect(tip.x - 15, 0, 30, tip.y);
-  
+
   // Core Beam (Narrow & Bright)
   ctx.fillStyle = '#fff';
   ctx.fillRect(tip.x - 4, 0, 8, tip.y);
-  
+
   // Spark at tip
   ctx.beginPath();
-  ctx.arc(tip.x, tip.y, 10 + Math.random()*5, 0, Math.PI*2);
+  ctx.arc(tip.x, tip.y, 10 + Math.random() * 5, 0, Math.PI * 2);
   ctx.fillStyle = '#fff';
   ctx.fill();
-  
+
   ctx.restore();
 }
 
@@ -834,28 +841,28 @@ function drawShield() {
   const pc = player.getCenter();
   const remaining = shieldEndTime - Date.now();
   if (remaining <= 0) return;
-  
+
   let alpha = 0.8;
   // Blinking effect in the last 1000ms
   if (remaining <= 1000) {
     alpha = (Math.floor(remaining / 100) % 2 === 0) ? 0.8 : 0.1;
   }
-  
+
   const r = player.hitRadius + 25;
   ctx.save();
   ctx.beginPath();
   ctx.arc(pc.x, pc.y, r, 0, Math.PI * 2);
-  
+
   // 3D bubble effect using radial gradient
   const grad = ctx.createRadialGradient(pc.x - r * 0.3, pc.y - r * 0.3, r * 0.1, pc.x, pc.y, r);
   grad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.9})`); // Specular highlight
   grad.addColorStop(0.3, `rgba(125, 211, 252, ${alpha * 0.2})`); // Transparent middle
   grad.addColorStop(0.8, `rgba(125, 211, 252, ${alpha * 0.5})`); // Inner edge
   grad.addColorStop(1, `rgba(125, 211, 252, ${alpha * 0.8})`); // Outer solid edge
-  
+
   ctx.fillStyle = grad;
   ctx.fill();
-  
+
   ctx.strokeStyle = `rgba(125, 211, 252, ${alpha})`;
   ctx.lineWidth = 2;
   ctx.shadowBlur = 20;
@@ -865,27 +872,254 @@ function drawShield() {
 }
 
 // ============================================
+//  BOSS SYSTEM HELPER FUNCTIONS
+// ============================================
+function addScore(points) {
+  const prevScore = score;
+  score += points;
+  updateScoreDisplay();
+  if (score % 10 === 0 && score > prevScore) escalateDifficulty();
+  
+  // Trigger Boss Phase every 200 points
+  if (Math.floor(score / 200) > Math.floor(prevScore / 200) && bossPhase === 0) {
+    prepareBossPhase();
+  }
+}
+
+function prepareBossPhase() {
+  bossPhase = 1;
+  if (enemySpawnInterval) {
+    clearInterval(enemySpawnInterval);
+    enemySpawnInterval = null;
+  }
+  console.log("BOSS PHASE PREPARED! Waiting for screen to clear...");
+}
+
+function spawnBoss() {
+  bossPhase = 2;
+  boss = new Boss(gameCanvas.width);
+  audioManager.playSFX('powerUp'); // use as spawn sound
+  console.log("BOSS SPAWNED!");
+}
+
+function defeatBoss() {
+  boss.active = false;
+  explosions.push(new Explosion(boss.x, boss.y, 100, '#10b981'));
+  audioManager.playSFX('powerUp'); 
+  addScore(30);
+  bossPhase = 0;
+  boss = null;
+  bossDefeatedCount++;
+  enemySpawnInterval = setInterval(spawnEnemy, getSpawnRate());
+  console.log("BOSS DEFEATED!");
+}
+
+// ============================================
+//  BOSS CLASS
+// ============================================
+class Boss {
+  constructor(canvasWidth) {
+    this.radius = 120; // Huge UFO (doubled size)
+    this.x = canvasWidth / 2;
+    this.y = -this.radius;
+    this.targetY = 200;
+    this.baseSpeed = BASE_ENEMY_SPEED[currentDifficulty] * 1.5 || 2;
+    this.speedX = this.baseSpeed;
+    
+    this.maxHp = 10 + bossDefeatedCount * 5;
+    this.hp = this.maxHp;
+    this.active = true;
+    
+    // Attack cycle: 2s wait, 0.5s warn, 1.5s fire
+    this.state = 'enter'; // enter, wait, warn, fire
+    this.cycleStart = Date.now();
+  }
+  
+  update() {
+    if (this.state === 'enter') {
+      this.y += 2;
+      if (this.y >= this.targetY) {
+        this.y = this.targetY;
+        this.state = 'wait';
+        this.cycleStart = Date.now();
+      }
+      return;
+    }
+    
+    // Movement
+    this.x += this.speedX;
+    if (this.x - this.radius < 0 || this.x + this.radius > gameCanvas.width) {
+      this.speedX *= -1;
+      this.x = Math.max(this.radius, Math.min(gameCanvas.width - this.radius, this.x));
+    }
+    
+    // State machine
+    const elapsed = Date.now() - this.cycleStart;
+    if (elapsed < 2000) {
+      this.state = 'wait';
+    } else if (elapsed < 2500) {
+      this.state = 'warn';
+    } else if (elapsed < 4000) {
+      if (this.state !== 'fire') {
+        audioManager.playSFX('laser');
+      }
+      this.state = 'fire';
+    } else {
+      this.state = 'wait';
+      this.cycleStart = Date.now();
+    }
+  }
+  
+  draw() {
+    ctx.save();
+    
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#10b981';
+    
+    const scale = this.radius / 60;
+    
+    // Glass dome
+    ctx.beginPath();
+    ctx.arc(this.x, this.y - 10 * scale, this.radius * 0.6, Math.PI, 0);
+    ctx.fillStyle = 'rgba(125, 211, 252, 0.6)';
+    ctx.fill();
+    ctx.lineWidth = 2 * scale;
+    ctx.strokeStyle = '#7dd3fc';
+    ctx.stroke();
+    
+    // Alien eye (inside dome)
+    ctx.beginPath();
+    ctx.arc(this.x, this.y - 15 * scale, 8 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = '#10b981';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(this.x, this.y - 15 * scale, 3 * scale, 0, Math.PI * 2);
+    ctx.fillStyle = '#000';
+    ctx.fill();
+    
+    // Main saucer
+    ctx.beginPath();
+    ctx.ellipse(this.x, this.y, this.radius, this.radius * 0.4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#334155';
+    ctx.fill();
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 3 * scale;
+    ctx.stroke();
+    
+    // Glowing engines on saucer
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.arc(this.x + i * 20 * scale, this.y + 5 * scale, 4 * scale, 0, Math.PI * 2);
+      ctx.fillStyle = (this.state === 'warn' && Math.floor(Date.now() / 100) % 2 === 0) ? '#fbbf24' : '#10b981';
+      ctx.fill();
+    }
+    
+    // HP Bar
+    const barWidth = 80 * scale;
+    const barHeight = 8 * scale;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(this.x - barWidth/2, this.y - this.radius - 20 * scale, barWidth, barHeight);
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(this.x - barWidth/2, this.y - this.radius - 20 * scale, barWidth * (this.hp / this.maxHp), barHeight);
+    ctx.strokeStyle = '#fff';
+    ctx.strokeRect(this.x - barWidth/2, this.y - this.radius - 20 * scale, barWidth, barHeight);
+    
+    ctx.restore();
+    
+    if (this.state === 'fire') {
+      this.drawLaser(scale);
+    } else if (this.state === 'warn') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.2)';
+      ctx.fillRect(this.x - 40 * scale, this.y + 10 * scale, 80 * scale, gameCanvas.height - this.y);
+      ctx.restore();
+    }
+  }
+  
+  drawLaser(scale = 1) {
+    ctx.save();
+    ctx.shadowBlur = 30 * scale;
+    ctx.shadowColor = '#3b82f6';
+    
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(this.x - 20 * scale, this.y + 10 * scale, 40 * scale, gameCanvas.height - this.y);
+    
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.6)';
+    ctx.fillRect(this.x - 40 * scale, this.y + 10 * scale, 80 * scale, gameCanvas.height - this.y);
+    
+    ctx.restore();
+  }
+}
+
+// ============================================
 //  COLLISION DETECTION
 // ============================================
 function checkCollisions() {
   const pc = player.getCenter();
 
+  // --- BOSS COLLISION ---
+  if (bossPhase === 2 && boss && boss.active) {
+    // 1. Bullets vs Boss
+    for (let b of bullets) {
+      if (!b.active) continue;
+      const dx = b.x - boss.x;
+      const dy = b.y - boss.y;
+      const dist = Math.sqrt(dx * dx + (dy * 2) * (dy * 2)); // Adjust for ellipse shape
+      if (dist < boss.radius) {
+        b.active = false;
+        explosions.push(new Explosion(b.x, b.y, 8, '#ffcc44'));
+        boss.hp--;
+        audioManager.playSFX('hitEnemy');
+        if (boss.hp <= 0) { defeatBoss(); break; }
+      }
+    }
+
+    // 2. Player Laser vs Boss
+    if (boss && boss.active && isLaserActive && player) {
+      const laserX = player.getBarrelTip().x;
+      if (Math.abs(boss.x - laserX) < boss.radius + 15) {
+        boss.hp -= 0.2;
+        if (Math.random() < 0.2) audioManager.playSFX('hitEnemy');
+        explosions.push(new Explosion(boss.x, boss.y + 20, 10, '#ff6b2b'));
+        if (boss.hp <= 0) { defeatBoss(); }
+      }
+    }
+
+    // 3. Boss Laser vs Player
+    if (boss && boss.active && boss.state === 'fire') {
+      const scale = boss.radius / 60;
+      if (Math.abs(pc.x - boss.x) < 40 * scale + player.hitRadius) {
+        if (isShieldActive) {
+          audioManager.playSFX('hitEnemy');
+          explosions.push(new Explosion(pc.x, pc.y, 50, '#a855f7'));
+          isShieldActive = false;
+          shieldEndTime = 0;
+        } else {
+          audioManager.playSFX('playerHit');
+          explosions.push(new Explosion(pc.x, pc.y, player.hitRadius, '#ff2d55'));
+          lives = 0;
+          updateLivesDisplay();
+          triggerGameOver();
+          return;
+        }
+      }
+    }
+  }
+
   // --- LASER COLLISION (Enemy & PowerUp) ---
   if (isLaserActive && player) {
     const laserX = player.getBarrelTip().x;
-    
+
     // 1. Laser vs Enemies
     for (let e of enemies) {
       if (e.active && Math.abs(e.x - laserX) < e.radius + 15) {
         e.active = false;
         audioManager.playSFX('hitEnemy');
         explosions.push(new Explosion(e.x, e.y, e.radius, '#ff6b2b'));
-        score += e.maxHp;
-        updateScoreDisplay();
-        if (score % 10 === 0) escalateDifficulty();
+        addScore(e.maxHp);
       }
     }
-    
+
     // 2. Laser vs PowerUps
     for (let pu of powerups) {
       if (pu.active && Math.abs(pu.x - laserX) < pu.radius + 15) {
@@ -917,9 +1151,7 @@ function checkCollisions() {
         const destroyed = e.takeDamage();
         if (destroyed) {
           explosions.push(new Explosion(e.x, e.y, e.radius, '#ff6b2b'));
-          score += e.maxHp;
-          updateScoreDisplay();
-          if (score % 10 === 0) escalateDifficulty();
+          addScore(e.maxHp);
         }
         break;
       }
@@ -938,9 +1170,7 @@ function checkCollisions() {
         audioManager.playSFX('hitEnemy');
         explosions.push(new Explosion(e.x, e.y, e.radius, '#a855f7'));
         e.active = false;
-        score += e.maxHp;
-        updateScoreDisplay();
-        if (score % 10 === 0) escalateDifficulty();
+        addScore(e.maxHp);
       } else {
         audioManager.playSFX('playerHit');
         explosions.push(new Explosion(e.x, e.y, e.radius, '#ff2d55'));
@@ -955,13 +1185,13 @@ function checkCollisions() {
   // --- PowerUp Collisions (Bullet only) ---
   for (let pu of powerups) {
     if (!pu.active) continue;
-    
+
     for (let b of bullets) {
       if (!b.active) continue;
       const dx = b.x - pu.x;
       const dy = b.y - pu.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      
+
       if (dist < pu.radius + 5) {
         b.active = false;
         pu.hp--;
@@ -978,7 +1208,7 @@ function checkCollisions() {
 
 function triggerGameOver() {
   gameRunning = false;
-  
+
   audioManager.pauseBGM('gameplayBGM');
   audioManager.playSFX('gameOver');
 
@@ -991,6 +1221,7 @@ function triggerGameOver() {
   // Clear power-up timers
   if (speedUpTimeout) clearTimeout(speedUpTimeout);
   if (laserTimeout) { clearTimeout(laserTimeout); audioManager.stopSFX('laser'); }
+  if (boss && boss.state === 'fire') { audioManager.stopSFX('laser'); }
   if (slowTimeout) clearTimeout(slowTimeout);
   if (shieldTimeout) clearTimeout(shieldTimeout);
   isSpeedUpActive = isLaserActive = isSlowActive = isShieldActive = false;
@@ -1014,11 +1245,11 @@ function triggerGameOver() {
 function saveHighScore(currentScore) {
   const STORAGE_KEY = 'spaceShooterHighScores';
   let highScores = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  
+
   highScores.push(currentScore);
   highScores.sort((a, b) => b - a); // Descending
   highScores = highScores.slice(0, 5); // Keep Top 5
-  
+
   localStorage.setItem(STORAGE_KEY, JSON.stringify(highScores));
 }
 
@@ -1031,14 +1262,14 @@ function renderHighScores() {
 
   const STORAGE_KEY = 'spaceShooterHighScores';
   highscoreList.innerHTML = '';
-  
+
   const highScores = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  
+
   if (highScores.length === 0) {
     highscoreList.innerHTML = '<li class="no-data">No records yet</li>';
     return;
   }
-  
+
   highScores.forEach((s, index) => {
     const li = document.createElement('li');
     li.innerHTML = `<span>Top ${index + 1}:</span> <strong>${s}</strong> pts`;
@@ -1067,7 +1298,7 @@ function spawnBullet() {
   if (!player || !gameRunning || isPaused || isLaserActive) return;
   const tip = player.getBarrelTip();
   bullets.push(new Bullet(tip.x, tip.y));
-  
+
   // Frequency of sound: normally 1 in 2 shots, with SpeedUp 1 in 4 shots
   bulletSoundCounter++;
   const threshold = isSpeedUpActive ? 4 : 2;
@@ -1103,11 +1334,12 @@ function initGame() {
   bullets = []; enemies = []; powerups = []; explosions = [];
   isPaused = false;
   difficultyLevel = 0;
+  bossPhase = 0; boss = null; bossDefeatedCount = 0;
   isSpeedUpActive = isLaserActive = isSlowActive = isShieldActive = false;
   speedUpEndTime = laserEndTime = slowEndTime = shieldEndTime = 0;
   if (powerupHud) powerupHud.innerHTML = '';
   gameRunning = true;
-  
+
   audioManager.pauseBGM('menuBGM');
   audioManager.playBGM('gameplayBGM');
 
@@ -1127,7 +1359,7 @@ function initGame() {
 
   // Start enemy spawning
   enemySpawnInterval = setInterval(spawnEnemy, getSpawnRate());
-  
+
   // Start Power-up spawning (every 5s)
   powerupSpawnInterval = setInterval(spawnPowerUp, 5000);
 
@@ -1169,6 +1401,14 @@ function gameLoop() {
     // 5. Update enemies
     for (const e of enemies) e.update();
 
+    // 5.5 Boss Phase Update
+    if (bossPhase === 1 && enemies.length === 0) {
+      spawnBoss();
+    }
+    if (bossPhase === 2 && boss && boss.active) {
+      boss.update();
+    }
+
     // 6. Update powerups
     for (const pu of powerups) pu.update();
 
@@ -1198,6 +1438,10 @@ function gameLoop() {
   for (const e of enemies) e.draw();
   for (const pu of powerups) pu.draw();
   for (const ex of explosions) ex.draw();
+
+  if (bossPhase === 2 && boss && boss.active) {
+    boss.draw();
+  }
 
   // 12. Next frame
   animationFrameId = requestAnimationFrame(gameLoop);
@@ -1265,7 +1509,7 @@ function quitGame() {
   if (autoShootInterval) { clearInterval(autoShootInterval); autoShootInterval = null; }
   if (enemySpawnInterval) { clearInterval(enemySpawnInterval); enemySpawnInterval = null; }
   if (powerupSpawnInterval) { clearInterval(powerupSpawnInterval); powerupSpawnInterval = null; }
-  
+
   if (speedUpTimeout) clearTimeout(speedUpTimeout);
   if (laserTimeout) { clearTimeout(laserTimeout); audioManager.stopSFX('laser'); }
   if (slowTimeout) clearTimeout(slowTimeout);
@@ -1278,13 +1522,14 @@ function quitGame() {
 
   score = 0; lives = 3; bullets = []; enemies = []; powerups = []; explosions = []; stars = [];
   player = null; currentDifficulty = ''; difficultyLevel = 0;
+  bossPhase = 0; boss = null; bossDefeatedCount = 0;
 
   pauseOverlay.classList.remove('active');
   gameoverOverlay.classList.remove('active');
   hideScreen(gameCanvas); hideScreen(gameHud);
   gameCanvas.style.cursor = 'default';
   menuContainer.style.display = 'flex';
-  
+
   audioManager.pauseBGM('gameplayBGM');
   audioManager.playBGM('menuBGM');
 }
